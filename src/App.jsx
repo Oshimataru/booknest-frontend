@@ -89,6 +89,7 @@ const App = () => {
     <div style={{ display:'flex', flexDirection:'column', minHeight:'100vh', background:'#0d1117' }}>
       <Navbar />
       <main style={{ flex:1 }}>
+        jsx<main style={{ flex: 1, paddingTop: '60px' }}></main>
         <Routes>
           <Route path="/"               element={<Home />} />
           <Route path="/login"          element={!user ? <Login />    : <Navigate to="/" />} />
