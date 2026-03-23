@@ -426,6 +426,24 @@ const Navbar = () => {
   color: #0ea1ce  !important;
 }
 `}</style>
+<style>{`
+/* ✨ FORCE CURSIVE BRAND */
+
+.nv-brand-text {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-style: italic !important;
+  font-size: 24px !important;
+  letter-spacing: 1px !important;
+  color: #1a1610 !important;
+}
+
+.nv-brand-text em {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-style: italic !important;
+  font-weight: 600 !important;
+  color: #a07828 !important;
+}
+`}</style>
 
       <nav className={`nv-root ${scrolled ? 'scrolled' : 'top'}`} role="navigation" aria-label="Main navigation">
         <div className="nv-bar">
