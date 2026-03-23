@@ -40,7 +40,7 @@ const Navbar = () => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500&family=Cormorant+Garamond:ital,wght@1,600&display=swap');
 
         .nv-root *, .nv-root *::before, .nv-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
