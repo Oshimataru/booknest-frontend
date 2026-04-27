@@ -150,11 +150,22 @@ const AdminDashboard = () => {
 
     const bookStatusData = {
         labels: ['Available','Sold','Rented','Exchanged'],
-        datasets: [{ data:[analytics?.availableBooks||0,analytics?.soldBooks||0,analytics?.rentedBooks||0,analytics?.exchangedBooks||0], backgroundColor:['#a07828','#4a7fa5','#7a68a8','#4a8c4a'], borderWidth:0 }]
+        datasets: [{
+            data:[analytics?.availableBooks||0,analytics?.soldBooks||0,analytics?.rentedBooks||0,analytics?.exchangedBooks||0],
+            backgroundColor:['#ffbe0b','#fb5607','#8338ec','#3a86ff'],
+            hoverOffset:18,
+            borderWidth:0,
+        }]
     };
     const orderStatusData = {
         labels: ['Pending','Delivered','Others'],
-        datasets: [{ label:'Orders', data:[analytics?.pendingOrders||0,analytics?.deliveredOrders||0,(analytics?.totalOrders||0)-(analytics?.pendingOrders||0)-(analytics?.deliveredOrders||0)], backgroundColor:['#a07828','#4a8c4a','#4a7fa5'], borderRadius:4 }]
+        datasets: [{
+            label:'Orders',
+            data:[analytics?.pendingOrders||0,analytics?.deliveredOrders||0,(analytics?.totalOrders||0)-(analytics?.pendingOrders||0)-(analytics?.deliveredOrders||0)],
+            backgroundColor:['#ff6b6b','#00d2d3','#ff9f1c'],
+            borderRadius:14,
+            borderSkipped:false,
+        }]
     };
 
     const bookTypeCounts = books.reduce((acc, b) => {
@@ -164,7 +175,12 @@ const AdminDashboard = () => {
     }, {});
     const bookTypeData = {
         labels: Object.keys(bookTypeCounts),
-        datasets: [{ data: Object.values(bookTypeCounts), backgroundColor:['#a07828','#4a7fa5','#7a68a8','#4a8c4a','#ffc107'], borderWidth:0 }]
+        datasets: [{
+            data: Object.values(bookTypeCounts),
+            backgroundColor:['#ff6b6b','#3b3b98','#0abde3','#10ac84','#f368e0','#ff9f43'],
+            hoverOffset:16,
+            borderWidth:0,
+        }]
     };
 
     const orderRevenueByStatus = orders.reduce((acc, order) => {
@@ -174,11 +190,47 @@ const AdminDashboard = () => {
     }, {});
     const orderRevenueData = {
         labels: Object.keys(orderRevenueByStatus),
-        datasets: [{ label:'Revenue', data: Object.values(orderRevenueByStatus), backgroundColor:['#4a8c4a','#4a7fa5','#a07828','#7a68a8','#c0392b'].slice(0, Object.keys(orderRevenueByStatus).length), borderRadius:4 }]
+        datasets: [{
+            label:'Revenue',
+            data: Object.values(orderRevenueByStatus),
+            backgroundColor:['#ff9f43','#ee5253','#1dd1a1','#5f27cd','#54a0ff'].slice(0, Object.keys(orderRevenueByStatus).length),
+            borderRadius:14,
+            borderSkipped:false,
+        }]
     };
 
-    const chartTextColor = 'rgba(255,255,255,0.6)';
-    const chartGridColor = 'rgba(255,193,7,0.1)';
+    const chartTextColor = 'rgba(255,255,255,0.85)';
+    const chartGridColor = 'rgba(255,193,7,0.16)';
+    const chartCommonOptions = {
+        animation: { duration: 1600, easing: 'easeOutQuart' },
+        plugins: {
+            legend: {
+                labels: { color: chartTextColor, font: { family:'Inter', size:12 } }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(15,15,15,0.95)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: 'rgba(255,255,255,0.12)',
+                borderWidth: 1,
+            }
+        }
+    };
+    const barChartOptions = {
+        ...chartCommonOptions,
+        plugins: { ...chartCommonOptions.plugins, legend: { display:false } },
+        scales: {
+            x: { ticks:{ color: chartTextColor }, grid:{ color: chartGridColor } },
+            y: { ticks:{ color: chartTextColor }, grid:{ color: chartGridColor }, beginAtZero:true }
+        }
+    };
+    const donutChartOptions = {
+        ...chartCommonOptions,
+        plugins: {
+            ...chartCommonOptions.plugins,
+            legend: { position:'bottom', labels:{ color:chartTextColor, font:{ family:'Inter', size:12 } } }
+        }
+    };
 
     // Still loading user from context — show nothing yet
     if (!user) return (
@@ -324,20 +376,54 @@ const AdminDashboard = () => {
             @media(max-width:720px){ .ad-charts { grid-template-columns:1fr; } }
 
             .ad-chart {
-                background: #0d0d0d;
-                border: 1px solid rgba(255,193,7,0.08);
-                border-radius: 8px;
+                background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+                border: 1px solid rgba(255,193,7,0.14);
+                border-radius: 16px;
                 padding: 20px;
+                box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+                animation: chartEntrance 0.9s ease-out both;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .ad-chart::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at top left, rgba(255,193,7,0.12), transparent 28%),
+                            radial-gradient(circle at bottom right, rgba(59,130,246,0.12), transparent 26%);
+                pointer-events: none;
             }
 
             .ad-chart-title {
                 font-size:12px; font-weight:600;
-                color:rgba(255,193,7,0.7);
-                text-transform:uppercase; letter-spacing:0.06em;
+                color:#ffe082;
+                text-transform:uppercase; letter-spacing:0.08em;
                 margin-bottom:16px;
+                position: relative;
+                z-index: 1;
             }
 
-            .ad-chart-wrap { max-width:260px; margin:0 auto; }
+            .ad-chart-wrap { max-width:260px; margin:0 auto; position: relative; z-index: 1; }
+
+            .ad-stat {
+                background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+                animation: statFade 1s ease both;
+            }
+
+            .ad-stat:nth-child(1) { animation-delay: 0s; }
+            .ad-stat:nth-child(2) { animation-delay: 0.08s; }
+            .ad-stat:nth-child(3) { animation-delay: 0.16s; }
+            .ad-stat:nth-child(4) { animation-delay: 0.24s; }
+
+            @keyframes chartEntrance {
+                from { transform: translateY(14px) scale(0.98); opacity: 0; }
+                to { transform: translateY(0) scale(1); opacity: 1; }
+            }
+            @keyframes statFade {
+                from { transform: translateY(10px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
 
             .ad-table-wrap {
                 background: #0d0d0d;
@@ -596,22 +682,22 @@ const AdminDashboard = () => {
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Book Status</div>
                                         <div className="ad-chart-wrap">
-                                            <Doughnut data={bookStatusData} options={{ plugins:{ legend:{ labels:{ color:chartTextColor, font:{ family:'Inter', size:12 } } } } }} />
+                                            <Doughnut data={bookStatusData} options={donutChartOptions} />
                                         </div>
                                     </div>
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Order Status</div>
-                                        <Bar data={orderStatusData} options={{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } }, y:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } } } }} />
+                                        <Bar data={orderStatusData} options={barChartOptions} />
                                     </div>
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Book Type Distribution</div>
                                         <div className="ad-chart-wrap">
-                                            <Pie data={bookTypeData} options={{ plugins:{ legend:{ labels:{ color:chartTextColor, font:{ family:'Inter', size:12 } } } } }} />
+                                            <Pie data={bookTypeData} options={donutChartOptions} />
                                         </div>
                                     </div>
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Revenue by Order Status</div>
-                                        <Bar data={orderRevenueData} options={{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } }, y:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } } } }} />
+                                        <Bar data={orderRevenueData} options={barChartOptions} />
                                     </div>
                                 </div>
                             ) : (
