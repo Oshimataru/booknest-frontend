@@ -30,52 +30,54 @@ const statusStyle = {
 const DELIVERY_STATUSES = ['PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 
 const AdminDashboard = () => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const [replyText,      setReplyText]      = useState({});
+    const [tab,            setTab]            = useState('analytics');
+    const [analytics,      setAnalytics]      = useState(null);
+    const [users,          setUsers]          = useState([]);
+    const [books,          setBooks]          = useState([]);
+    const [orders,         setOrders]         = useState([]);
+    const [messages,       setMessages]       = useState([]);
+    const [filterPriority, setFilterPriority] = useState('ALL');
+    const [loading,        setLoading]        = useState(true);
+    const [error,          setError]          = useState('');
+
+    const [deliveryModal,  setDeliveryModal]  = useState(null);
+    const [deliveryForm,   setDeliveryForm]   = useState({ status:'PROCESSING', currentLocation:'', message:'', latitude:'', longitude:'' });
+    const [deliverySaving, setDeliverySaving] = useState(false);
+    const [deliveryError,  setDeliveryError]  = useState('');
+    const [deliveryOk,     setDeliveryOk]     = useState(false);
+
+    useEffect(() => {
+        // user is still loading from context — wait
+        if (user === undefined) return;
+        // not logged in at all
+        if (user === null) { navigate('/login'); return; }
+        // logged in but not admin
+        if (user.role !== 'ADMIN') { navigate('/'); return; }
+        fetchAll();
+    }, [user]);
 
     const getCoordinates = async (place) => {
         if (!place || place.trim() === '') return;
         try {
             const res = await fetch(
                 `https://api.api-ninjas.com/v1/geocoding?city=${encodeURIComponent(place)}`,
-                { method: 'GET', headers: { 'X-Api-Key': import.meta.env.VITE_GEOCODING_API_KEY || 'kjoESO3ukVLvq9v9Q6X9nhtIqJm3LyPxHo8PcQyc' } }
+                { headers: { 'X-Api-Key': import.meta.env.VITE_GEOCODING_API_KEY || 'kjoESO3ukVLvq9v9Q6X9nhtIqJm3LyPxHo8PcQyc' } }
             );
-            if (!res.ok) throw new Error(`API Error: ${res.status}`);
             const data = await res.json();
             if (!data || data.length === 0) { alert('Location not found ❌'); return; }
             setDeliveryForm(prev => ({ ...prev, latitude: data[0].latitude, longitude: data[0].longitude }));
-        } catch (err) {
-            alert(`Geocoding failed: ${err.message}`);
-        }
+        } catch (err) { alert(`Geocoding failed: ${err.message}`); }
     };
 
-    const { user } = useAuth();
-    const navigate = useNavigate();
-
-    const [replyText,       setReplyText]       = useState({});
-    const [tab,             setTab]             = useState('analytics');
-    const [analytics,       setAnalytics]       = useState(null);
-    const [users,           setUsers]           = useState([]);
-    const [books,           setBooks]           = useState([]);
-    const [orders,          setOrders]          = useState([]);
-    const [messages,        setMessages]        = useState([]);
-    const [filterPriority,  setFilterPriority]  = useState('ALL');
-    const [loading,         setLoading]         = useState(true);
-    const [error,           setError]           = useState('');
-    const [deliveryModal,   setDeliveryModal]   = useState(null);
-    const [deliveryForm,    setDeliveryForm]    = useState({ status:'PROCESSING', currentLocation:'', message:'', latitude:'', longitude:'' });
-    const [deliverySaving,  setDeliverySaving]  = useState(false);
-    const [deliveryError,   setDeliveryError]   = useState('');
-    const [deliveryOk,      setDeliveryOk]      = useState(false);
-
-    useEffect(() => {
-        if (!user) return;
-        if (user.role !== 'ADMIN') { navigate('/'); return; }
-        fetchAll();
-    }, [user]);
-
-    const token = localStorage.getItem('token');
-
     const fetchAll = async () => {
+        setLoading(true);
+        setError('');
         try {
+            const token = localStorage.getItem('token');
             const [aR, uR, bR, oR, mR] = await Promise.all([
                 getAdminAnalytics(),
                 getAdminUsers(),
@@ -89,7 +91,8 @@ const AdminDashboard = () => {
             setOrders(oR.data);
             setMessages(mR.data);
         } catch (err) {
-            setError(err.response?.data || 'Failed to load admin data.');
+            console.error(err);
+            setError(err.response?.data || 'Failed to load admin data. Check console.');
         } finally {
             setLoading(false);
         }
@@ -97,38 +100,37 @@ const AdminDashboard = () => {
 
     const handleDeleteUser = async (id) => {
         if (!window.confirm('Delete this user?')) return;
-        try { await deleteAdminUser(id); setUsers(users.filter(u => u.id !== id)); }
-        catch (err) { setError(err.response?.data || 'Something went wrong.'); }
+        try { await deleteAdminUser(id); setUsers(u => u.filter(x => x.id !== id)); }
+        catch (err) { setError(err.response?.data || 'Delete failed.'); }
     };
 
     const handleDeleteBook = async (id) => {
         if (!window.confirm('Delete this book?')) return;
-        try { await deleteAdminBook(id); setBooks(books.filter(b => b.id !== id)); }
-        catch (err) { setError(err.response?.data || 'Something went wrong.'); }
+        try { await deleteAdminBook(id); setBooks(b => b.filter(x => x.id !== id)); }
+        catch (err) { setError(err.response?.data || 'Delete failed.'); }
     };
 
     const sendReply = async (id) => {
         try {
             const token = localStorage.getItem('token');
             await axios.put(`${API}/api/contact/${id}/reply`, { reply: replyText[id] }, { headers: { Authorization: `Bearer ${token}` } });
-            setMessages(messages.map(m => m.id === id ? { ...m, reply: replyText[id], status: 'RESOLVED' } : m));
-            setReplyText({ ...replyText, [id]: '' });
-        } catch { alert('Failed ❌'); }
+            setMessages(m => m.map(x => x.id === id ? { ...x, reply: replyText[id], status: 'RESOLVED' } : x));
+            setReplyText(r => ({ ...r, [id]: '' }));
+        } catch { alert('Failed to send reply ❌'); }
     };
 
     const updateStatus = async (id, status) => {
         try {
             const token = localStorage.getItem('token');
             await axios.put(`${API}/api/contact/${id}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
-            setMessages(messages.map(m => m.id === id ? { ...m, status } : m));
+            setMessages(m => m.map(x => x.id === id ? { ...x, status } : x));
         } catch { alert('Failed to update status ❌'); }
     };
 
     const openDeliveryModal = (order) => {
         setDeliveryModal(order);
         setDeliveryForm({ status:'PROCESSING', currentLocation:'', message:'', latitude:'', longitude:'' });
-        setDeliveryError('');
-        setDeliveryOk(false);
+        setDeliveryError(''); setDeliveryOk(false);
     };
 
     const handleDeliveryUpdate = async (e) => {
@@ -151,447 +153,541 @@ const AdminDashboard = () => {
             setTimeout(() => setDeliveryModal(null), 1200);
         } catch (err) {
             setDeliveryError(err.response?.data || 'Failed to update delivery.');
-        } finally {
-            setDeliverySaving(false);
-        }
+        } finally { setDeliverySaving(false); }
     };
 
     const bookStatusData = {
         labels: ['Available', 'Sold', 'Rented', 'Exchanged'],
-        datasets: [{ data: [analytics?.availableBooks||0, analytics?.soldBooks||0, analytics?.rentedBooks||0, analytics?.exchangedBooks||0], backgroundColor: ['#a07828','#4a7fa5','#7a68a8','#4a8c4a'], borderWidth: 0 }]
+        datasets: [{ data: [analytics?.availableBooks||0, analytics?.soldBooks||0, analytics?.rentedBooks||0, analytics?.exchangedBooks||0], backgroundColor:['#a07828','#4a7fa5','#7a68a8','#4a8c4a'], borderWidth:0 }]
     };
     const orderStatusData = {
-        labels: ['Pending', 'Delivered', 'Others'],
-        datasets: [{ label:'Orders', data: [analytics?.pendingOrders||0, analytics?.deliveredOrders||0, (analytics?.totalOrders||0)-(analytics?.pendingOrders||0)-(analytics?.deliveredOrders||0)], backgroundColor: ['#a07828','#4a8c4a','#4a7fa5'], borderRadius: 4 }]
+        labels: ['Pending','Delivered','Others'],
+        datasets: [{ label:'Orders', data:[analytics?.pendingOrders||0, analytics?.deliveredOrders||0, (analytics?.totalOrders||0)-(analytics?.pendingOrders||0)-(analytics?.deliveredOrders||0)], backgroundColor:['#a07828','#4a8c4a','#4a7fa5'], borderRadius:4 }]
     };
     const chartTextColor = 'rgba(255,255,255,0.6)';
     const chartGridColor = 'rgba(255,193,7,0.1)';
 
+    // Still resolving user from context
+    if (user === undefined) return null;
+
     return (
         <>
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Fraunces:ital,wght@0,600;1,400&display=swap');
+        <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fraunces:ital,wght@0,600;1,400&display=swap');
 
-                .ad * { box-sizing: border-box; margin: 0; padding: 0; }
+            .ad *, .ad *::before, .ad *::after { box-sizing: border-box; }
 
-                .ad {
-                    min-height: 100vh;
-                    background: #000;
-                    font-family: 'Inter', sans-serif;
-                    color: #fff;
-                    padding: 48px 32px 80px;
-                }
+            .ad {
+                min-height: 100vh;
+                background: #050505;
+                font-family: 'Inter', sans-serif;
+                color: #fff;
+                padding: 36px 28px 80px;
+            }
 
-                .ad-wrap { max-width: 1200px; margin: 0 auto; }
+            .ad-wrap { max-width: 1280px; margin: 0 auto; }
 
-                /* ── HEADER ── */
-                .ad-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 28px;
-                    flex-wrap: wrap;
-                    gap: 16px;
-                }
+            /* ── HEADER ── */
+            .ad-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 32px;
+                flex-wrap: wrap;
+                gap: 16px;
+                padding-bottom: 24px;
+                border-bottom: 1px solid rgba(255,193,7,0.1);
+            }
 
-                .ad-title { font-family: 'Fraunces', serif; font-size: 34px; color: #fff; }
-                .ad-title span { color: #ffc107; }
+            .ad-title { font-family:'Fraunces',serif; font-size:32px; color:#fff; line-height:1; }
+            .ad-title span { color:#ffc107; }
+            .ad-subtitle { font-size:12px; color:rgba(255,255,255,0.35); margin-top:4px; }
 
-                /* ── TABS ── */
-                .ad-tabs {
-                    display: flex;
-                    flex-wrap: wrap;
-                    border: 1px solid rgba(255,193,7,0.25);
-                    border-radius: 6px;
-                    overflow: hidden;
-                    background: #111;
-                }
+            /* ── TABS ── */
+            .ad-tabs {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                background: #111;
+                border: 1px solid rgba(255,193,7,0.15);
+                border-radius: 8px;
+                padding: 4px;
+            }
 
-                .ad-tab {
-                    padding: 10px 18px;
-                    background: #111;
-                    border: none;
-                    border-right: 1px solid rgba(255,193,7,0.1);
-                    color: rgba(255,255,255,0.65);
-                    cursor: pointer;
-                    font-size: 13px;
-                    font-family: 'Inter', sans-serif;
-                    transition: background 0.15s, color 0.15s;
-                }
+            .ad-tab {
+                padding: 8px 16px;
+                background: transparent;
+                border: none;
+                border-radius: 5px;
+                color: rgba(255,255,255,0.5);
+                cursor: pointer;
+                font-size: 13px;
+                font-family: 'Inter', sans-serif;
+                font-weight: 500;
+                transition: all 0.15s;
+                white-space: nowrap;
+            }
 
-                .ad-tab:last-child { border-right: none; }
+            .ad-tab:hover { color:#fff; background:rgba(255,193,7,0.08); }
 
-                .ad-tab.act {
-                    background: #ffc107;
-                    color: #000;
-                    font-weight: 600;
-                }
+            .ad-tab.act {
+                background: #ffc107;
+                color: #000;
+                font-weight: 600;
+            }
 
-                .ad-tab:hover:not(.act) {
-                    background: rgba(255,193,7,0.12);
-                    color: #fff;
-                }
+            /* ── ERROR / RETRY ── */
+            .ad-err {
+                background: rgba(255,80,80,0.08);
+                border: 1px solid rgba(255,80,80,0.25);
+                color: rgba(255,100,100,0.9);
+                padding: 14px 18px;
+                border-radius: 6px;
+                margin-bottom: 24px;
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
 
-                /* ── STATS ── */
-                .ad-stats {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
-                    gap: 10px;
-                    margin-bottom: 25px;
-                }
+            .ad-retry {
+                background: rgba(255,80,80,0.15);
+                border: 1px solid rgba(255,80,80,0.3);
+                color: rgba(255,100,100,0.9);
+                padding: 5px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                white-space: nowrap;
+            }
 
-                .ad-stat {
-                    background: #0a0a0a;
-                    border: 1px solid rgba(255,193,7,0.08);
-                    padding: 22px;
-                    text-align: center;
-                    border-radius: 4px;
-                }
+            /* ── LOADING ── */
+            .ad-loading {
+                display: flex;
+                gap: 8px;
+                justify-content: center;
+                align-items: center;
+                padding: 100px 0;
+            }
 
-                .ad-stat-num { font-size: 28px; color: #ffc107; font-weight: 500; }
-                .ad-stat-label { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+            .ad-dot {
+                width: 9px; height: 9px;
+                border-radius: 50%;
+                background: #ffc107;
+                display: inline-block;
+                animation: adBounce 1.2s ease-in-out infinite;
+            }
+            .ad-dot:nth-child(2) { animation-delay:.15s; }
+            .ad-dot:nth-child(3) { animation-delay:.3s; }
 
-                /* ── CHARTS ── */
-                .ad-charts {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 16px;
-                }
+            @keyframes adBounce {
+                0%,80%,100% { transform:translateY(0); opacity:0.3; }
+                40%          { transform:translateY(-8px); opacity:1; }
+            }
 
-                @media (max-width: 700px) { .ad-charts { grid-template-columns: 1fr; } }
+            /* ── SECTION TITLE ── */
+            .ad-section-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
 
-                .ad-chart {
-                    background: #0a0a0a;
-                    padding: 20px;
-                    border: 1px solid rgba(255,193,7,0.08);
-                    border-radius: 4px;
-                }
+            .ad-section-title {
+                font-size: 18px;
+                font-weight: 600;
+                color: #fff;
+            }
 
-                .ad-chart-title {
-                    color: rgba(255,193,7,0.7);
-                    font-size: 13px;
-                    margin-bottom: 16px;
-                    font-weight: 500;
-                }
+            .ad-section-count {
+                font-size: 12px;
+                color: rgba(255,255,255,0.35);
+                background: rgba(255,255,255,0.05);
+                padding: 4px 10px;
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.08);
+            }
 
-                .ad-chart-wrap { max-width: 280px; margin: 0 auto; }
+            /* ── STATS GRID ── */
+            .ad-stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+                gap: 12px;
+                margin-bottom: 28px;
+            }
 
-                /* ── TABLE WRAPPER ── */
-                .ad-table-wrap {
-                    border: 1px solid rgba(255,193,7,0.08);
-                    border-radius: 4px;
-                    overflow: hidden;
-                }
+            .ad-stat {
+                background: #0d0d0d;
+                border: 1px solid rgba(255,193,7,0.1);
+                border-radius: 8px;
+                padding: 24px 20px;
+                text-align: center;
+                transition: border-color 0.2s;
+            }
 
-                .ad-table-head {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 14px 16px;
-                    background: #0a0a0a;
-                    border-bottom: 1px solid rgba(255,193,7,0.08);
-                    flex-wrap: wrap;
-                    gap: 10px;
-                }
+            .ad-stat:hover { border-color: rgba(255,193,7,0.3); }
 
-                .ad-table-title { color: #fff; font-weight: 500; }
-                .ad-table-count { color: rgba(255,255,255,0.45); font-size: 13px; }
+            .ad-stat-num {
+                font-size: 30px;
+                font-weight: 600;
+                color: #ffc107;
+                line-height: 1;
+            }
 
-                /* ── TABLE ── */
-                .ad-table { width: 100%; border-collapse: collapse; }
+            .ad-stat-label {
+                font-size: 11px;
+                color: rgba(255,255,255,0.35);
+                margin-top: 6px;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
 
-                .ad-table thead { background: #0a0a0a; }
+            /* ── CHARTS ── */
+            .ad-charts {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
 
-                .ad-table th {
-                    color: #ffc107;
-                    padding: 12px 14px;
-                    text-align: left;
-                    font-size: 12px;
-                    font-weight: 500;
-                    letter-spacing: 0.03em;
-                    border-bottom: 1px solid rgba(255,193,7,0.08);
-                }
+            @media(max-width:720px) { .ad-charts { grid-template-columns:1fr; } }
 
-                .ad-table td {
-                    padding: 12px 14px;
-                    color: rgba(255,255,255,0.8);
-                    border-bottom: 1px solid rgba(255,255,255,0.04);
-                    font-size: 13px;
-                }
+            .ad-chart {
+                background: #0d0d0d;
+                border: 1px solid rgba(255,193,7,0.08);
+                border-radius: 8px;
+                padding: 20px;
+            }
 
-                .ad-table tbody tr { background: #000; transition: background 0.15s; }
-                .ad-table tbody tr:hover { background: #0f0f0f; }
+            .ad-chart-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: rgba(255,193,7,0.7);
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                margin-bottom: 16px;
+            }
 
-                /* ── BADGES ── */
-                .ad-badge {
-                    display: inline-block;
-                    padding: 3px 10px;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: 500;
-                    border: 1px solid transparent;
-                    background: rgba(255,193,7,0.08);
-                    color: rgba(255,193,7,0.8);
-                }
+            .ad-chart-wrap { max-width: 260px; margin: 0 auto; }
 
-                .ad-role-admin { background: rgba(122,104,168,0.12); color: #7a68a8; border-color: rgba(122,104,168,0.25); }
-                .ad-role-user  { background: rgba(74,127,165,0.1);  color: #4a7fa5;  border-color: rgba(74,127,165,0.2);  }
+            /* ── TABLE WRAPPER ── */
+            .ad-table-wrap {
+                background: #0d0d0d;
+                border: 1px solid rgba(255,193,7,0.08);
+                border-radius: 8px;
+                overflow: hidden;
+            }
 
-                /* ── BUTTONS ── */
-                .ad-upd-btn {
-                    background: #ffc107;
-                    color: #000;
-                    padding: 6px 12px;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 12px;
-                    font-weight: 600;
-                    transition: background 0.15s;
-                }
+            .ad-table-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 20px;
+                border-bottom: 1px solid rgba(255,193,7,0.07);
+                flex-wrap: wrap;
+                gap: 10px;
+            }
 
-                .ad-upd-btn:hover { background: #ffcf3a; }
+            .ad-table-title { font-size:15px; font-weight:600; color:#fff; }
+            .ad-table-count { font-size:12px; color:rgba(255,255,255,0.35); }
 
-                .ad-del-btn {
-                    border: 1px solid rgba(255,80,80,0.25);
-                    color: rgba(255,80,80,0.8);
-                    padding: 6px 12px;
-                    background: transparent;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 12px;
-                    transition: background 0.15s;
-                }
+            /* ── TABLE ── */
+            .ad-table { width:100%; border-collapse:collapse; }
 
-                .ad-del-btn:hover { background: rgba(255,80,80,0.1); }
+            .ad-table thead { background:#080808; }
 
-                /* ── ERROR ── */
-                .ad-err {
-                    background: rgba(255,80,80,0.08);
-                    border: 1px solid rgba(255,80,80,0.2);
-                    color: rgba(255,80,80,0.9);
-                    padding: 12px 16px;
-                    border-radius: 4px;
-                    margin-bottom: 20px;
-                    font-size: 13px;
-                }
+            .ad-table th {
+                color: rgba(255,193,7,0.8);
+                padding: 11px 16px;
+                text-align: left;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                border-bottom: 1px solid rgba(255,193,7,0.07);
+                white-space: nowrap;
+            }
 
-                /* ── LOADING ── */
-                .ad-loading {
-                    display: flex;
-                    gap: 8px;
-                    justify-content: center;
-                    padding: 60px 0;
-                }
+            .ad-table td {
+                padding: 13px 16px;
+                color: rgba(255,255,255,0.75);
+                border-bottom: 1px solid rgba(255,255,255,0.04);
+                font-size: 13px;
+                vertical-align: middle;
+            }
 
-                .ad-dot {
-                    width: 8px; height: 8px;
-                    border-radius: 50%;
-                    background: #ffc107;
-                    animation: adPulse 1.2s ease-in-out infinite;
-                }
+            .ad-table tbody tr { transition: background 0.15s; }
+            .ad-table tbody tr:hover { background: rgba(255,193,7,0.03); }
+            .ad-table tbody tr:last-child td { border-bottom: none; }
 
-                .ad-dot:nth-child(2) { animation-delay: 0.2s; }
-                .ad-dot:nth-child(3) { animation-delay: 0.4s; }
+            /* overflow for wide tables */
+            .ad-table-scroll { overflow-x: auto; }
 
-                @keyframes adPulse {
-                    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-                    40%           { opacity: 1;   transform: scale(1.1); }
-                }
+            /* ── BADGES ── */
+            .ad-badge {
+                display: inline-block;
+                padding: 3px 10px;
+                border-radius: 20px;
+                font-size: 11px;
+                font-weight: 600;
+                border: 1px solid transparent;
+                background: rgba(255,193,7,0.1);
+                color: rgba(255,193,7,0.85);
+                border-color: rgba(255,193,7,0.2);
+                white-space: nowrap;
+            }
 
-                /* ── MODAL OVERLAY ── */
-                .ad-modal-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0,0,0,0.85);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 1000;
-                    padding: 20px;
-                }
+            .ad-role-admin { background:rgba(122,104,168,0.15); color:#9d8fd4; border-color:rgba(122,104,168,0.3); }
+            .ad-role-user  { background:rgba(74,127,165,0.12);  color:#6aadd4; border-color:rgba(74,127,165,0.25); }
 
-                /* ── MODAL ── */
-                .ad-modal {
-                    width: 520px;
-                    max-width: 100%;
-                    background: #0a0a0a;
-                    border: 1px solid rgba(255,193,7,0.18);
-                    border-radius: 8px;
-                    overflow: hidden;
-                }
+            /* ── BUTTONS ── */
+            .ad-upd-btn {
+                background: #ffc107;
+                color: #000;
+                padding: 6px 14px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 700;
+                font-family: 'Inter', sans-serif;
+                transition: background 0.15s, transform 0.1s;
+                white-space: nowrap;
+            }
 
-                .ad-modal-head {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    padding: 18px 20px;
-                    background: #000;
-                    border-bottom: 1px solid rgba(255,193,7,0.08);
-                }
+            .ad-upd-btn:hover { background:#ffd03a; transform:translateY(-1px); }
+            .ad-upd-btn:active { transform:translateY(0); }
 
-                .ad-modal-title { color: #fff; font-size: 16px; font-weight: 500; }
+            .ad-del-btn {
+                border: 1px solid rgba(255,80,80,0.25);
+                color: rgba(255,90,90,0.85);
+                padding: 6px 14px;
+                background: transparent;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 12px;
+                font-family: 'Inter', sans-serif;
+                transition: background 0.15s;
+            }
 
-                .ad-modal-sub {
-                    color: rgba(255,255,255,0.4);
-                    font-size: 12px;
-                    margin-top: 4px;
-                }
+            .ad-del-btn:hover { background:rgba(255,80,80,0.1); }
 
-                .ad-modal-close {
-                    background: none;
-                    border: none;
-                    color: rgba(255,255,255,0.4);
-                    font-size: 22px;
-                    cursor: pointer;
-                    line-height: 1;
-                    padding: 0;
-                    transition: color 0.15s;
-                }
+            /* ── MODAL ── */
+            .ad-modal-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.88);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                padding: 20px;
+                backdrop-filter: blur(4px);
+            }
 
-                .ad-modal-close:hover { color: #fff; }
+            .ad-modal {
+                width: 540px;
+                max-width: 100%;
+                max-height: 90vh;
+                overflow-y: auto;
+                background: #0d0d0d;
+                border: 1px solid rgba(255,193,7,0.2);
+                border-radius: 10px;
+                overflow: hidden;
+            }
 
-                .ad-modal-body {
-                    padding: 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
+            .ad-modal-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                padding: 20px 22px;
+                background: #080808;
+                border-bottom: 1px solid rgba(255,193,7,0.08);
+            }
 
-                .ad-modal-foot {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 10px;
-                    padding: 14px 20px;
-                    border-top: 1px solid rgba(255,255,255,0.05);
-                    background: #000;
-                }
+            .ad-modal-title { font-size:17px; font-weight:600; color:#fff; }
+            .ad-modal-sub   { font-size:12px; color:rgba(255,255,255,0.35); margin-top:4px; }
 
-                /* ── MODAL FORM ── */
-                .ad-m-label {
-                    font-size: 11px;
-                    color: rgba(255,193,7,0.6);
-                    margin-bottom: 6px;
-                    font-weight: 500;
-                    letter-spacing: 0.04em;
-                    text-transform: uppercase;
-                }
+            .ad-modal-close {
+                background: none;
+                border: none;
+                color: rgba(255,255,255,0.4);
+                font-size: 24px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                transition: color 0.15s;
+            }
+            .ad-modal-close:hover { color:#fff; }
 
-                .ad-m-input,
-                .ad-m-select,
-                .ad-m-textarea {
-                    background: #111;
-                    color: #fff;
-                    border: 1px solid rgba(255,255,255,0.08);
-                    padding: 9px 12px;
-                    width: 100%;
-                    border-radius: 4px;
-                    font-family: 'Inter', sans-serif;
-                    font-size: 13px;
-                    outline: none;
-                    transition: border-color 0.15s;
-                }
+            .ad-modal-body {
+                padding: 22px;
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+            }
 
-                .ad-m-textarea { min-height: 80px; resize: vertical; }
+            .ad-modal-foot {
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+                padding: 16px 22px;
+                border-top: 1px solid rgba(255,255,255,0.05);
+                background: #080808;
+            }
 
-                .ad-m-input:focus,
-                .ad-m-select:focus,
-                .ad-m-textarea:focus { border-color: rgba(255,193,7,0.5); }
+            /* ── FORM ELEMENTS ── */
+            .ad-m-label {
+                font-size: 11px;
+                color: rgba(255,193,7,0.6);
+                font-weight: 600;
+                margin-bottom: 7px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                display: block;
+            }
 
-                .ad-m-select option { background: #111; }
+            .ad-m-input,
+            .ad-m-select,
+            .ad-m-textarea {
+                background: #111;
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.08);
+                padding: 10px 12px;
+                width: 100%;
+                border-radius: 5px;
+                font-family: 'Inter', sans-serif;
+                font-size: 13px;
+                outline: none;
+                transition: border-color 0.15s;
+            }
 
-                .ad-m-row {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 12px;
-                }
+            .ad-m-textarea { min-height: 90px; resize: vertical; }
+            .ad-m-input:focus, .ad-m-select:focus, .ad-m-textarea:focus { border-color: rgba(255,193,7,0.45); }
+            .ad-m-select option { background:#111; }
 
-                .ad-m-err {
-                    background: rgba(255,80,80,0.08);
-                    border: 1px solid rgba(255,80,80,0.2);
-                    color: rgba(255,80,80,0.9);
-                    padding: 10px 12px;
-                    border-radius: 4px;
-                    font-size: 13px;
-                }
+            .ad-m-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-                .ad-m-ok {
-                    background: rgba(80,160,80,0.1);
-                    border: 1px solid rgba(80,160,80,0.25);
-                    color: #4a8c4a;
-                    padding: 10px 12px;
-                    border-radius: 4px;
-                    font-size: 13px;
-                }
+            .ad-m-err {
+                background:rgba(255,80,80,0.08);
+                border:1px solid rgba(255,80,80,0.22);
+                color:rgba(255,100,100,0.9);
+                padding:10px 14px;
+                border-radius:5px;
+                font-size:13px;
+            }
 
-                .ad-m-cancel {
-                    background: transparent;
-                    border: 1px solid rgba(255,255,255,0.12);
-                    color: rgba(255,255,255,0.6);
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    transition: border-color 0.15s, color 0.15s;
-                }
+            .ad-m-ok {
+                background:rgba(80,160,80,0.1);
+                border:1px solid rgba(80,160,80,0.25);
+                color:#5ab85a;
+                padding:10px 14px;
+                border-radius:5px;
+                font-size:13px;
+            }
 
-                .ad-m-cancel:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+            .ad-m-cancel {
+                background:transparent;
+                border:1px solid rgba(255,255,255,0.12);
+                color:rgba(255,255,255,0.55);
+                padding:9px 18px;
+                border-radius:5px;
+                cursor:pointer;
+                font-size:13px;
+                transition:all 0.15s;
+            }
+            .ad-m-cancel:hover { border-color:rgba(255,255,255,0.3); color:#fff; }
 
-                .ad-m-save {
-                    background: #ffc107;
-                    color: #000;
-                    border: none;
-                    padding: 8px 20px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    font-weight: 600;
-                    transition: background 0.15s;
-                }
+            .ad-m-save {
+                background:#ffc107;
+                color:#000;
+                border:none;
+                padding:9px 22px;
+                border-radius:5px;
+                cursor:pointer;
+                font-size:13px;
+                font-weight:700;
+                transition:background 0.15s;
+            }
+            .ad-m-save:hover:not(:disabled) { background:#ffd03a; }
+            .ad-m-save:disabled { opacity:0.5; cursor:not-allowed; }
 
-                .ad-m-save:hover:not(:disabled) { background: #ffcf3a; }
-                .ad-m-save:disabled { opacity: 0.5; cursor: not-allowed; }
-            `}</style>
+            /* ── EMPTY STATE ── */
+            .ad-empty {
+                text-align:center;
+                padding: 60px 20px;
+                color:rgba(255,255,255,0.25);
+                font-size:14px;
+            }
 
-            <div className="ad">
-                <div className="ad-wrap">
+            /* ── RESPONSIVE ── */
+            @media(max-width:600px) {
+                .ad { padding:20px 14px 60px; }
+                .ad-tab { padding:7px 11px; font-size:12px; }
+                .ad-m-row { grid-template-columns:1fr; }
+            }
+        `}</style>
 
-                    {/* ── Header & Tabs ── */}
-                    <div className="ad-header">
+        <div className="ad">
+            <div className="ad-wrap">
+
+                {/* ── HEADER ── */}
+                <div className="ad-header">
+                    <div>
                         <h1 className="ad-title">Admin <span>Dashboard</span></h1>
-                        <div className="ad-tabs">
-                            {['analytics','users','books','orders','delivery','messages'].map(t => (
-                                <button key={t} className={`ad-tab${tab === t ? ' act' : ''}`} onClick={() => setTab(t)}>
-                                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                                </button>
-                            ))}
-                        </div>
+                        <div className="ad-subtitle">BookNest control panel — {user?.name}</div>
                     </div>
+                    <div className="ad-tabs">
+                        {[
+                            { key:'analytics', label:'📊 Analytics' },
+                            { key:'users',     label:'👥 Users'     },
+                            { key:'books',     label:'📚 Books'     },
+                            { key:'orders',    label:'🛒 Orders'    },
+                            { key:'delivery',  label:'🚚 Delivery'  },
+                            { key:'messages',  label:'✉️ Messages'  },
+                        ].map(({ key, label }) => (
+                            <button key={key} className={`ad-tab${tab === key ? ' act' : ''}`} onClick={() => setTab(key)}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                    {error && <div className="ad-err">{error}</div>}
+                {/* ── ERROR ── */}
+                {error && (
+                    <div className="ad-err">
+                        <span>⚠️ {error}</span>
+                        <button className="ad-retry" onClick={fetchAll}>Retry</button>
+                    </div>
+                )}
 
-                    {loading ? (
-                        <div className="ad-loading">
-                            <span className="ad-dot"/><span className="ad-dot"/><span className="ad-dot"/>
-                        </div>
-                    ) : <>
+                {/* ── LOADING ── */}
+                {loading ? (
+                    <div className="ad-loading">
+                        <span className="ad-dot"/><span className="ad-dot"/><span className="ad-dot"/>
+                    </div>
+                ) : <>
 
-                        {/* ── Analytics ── */}
-                        {tab === 'analytics' && analytics && (
-                            <>
-                                <div className="ad-stats">
-                                    {[
-                                        ['Total Users',  analytics.totalUsers],
-                                        ['Total Books',  analytics.totalBooks],
-                                        ['Total Orders', analytics.totalOrders],
-                                        ['Revenue',      `₹${analytics.totalRevenue?.toFixed(0)}`],
-                                    ].map(([label, val]) => (
-                                        <div key={label} className="ad-stat">
-                                            <div className="ad-stat-num">{val}</div>
-                                            <div className="ad-stat-label">{label}</div>
-                                        </div>
-                                    ))}
-                                </div>
+                    {/* ══ ANALYTICS ══ */}
+                    {tab === 'analytics' && (
+                        <>
+                            <div className="ad-stats">
+                                {[
+                                    ['Total Users',  analytics?.totalUsers  ?? '—'],
+                                    ['Total Books',  analytics?.totalBooks  ?? '—'],
+                                    ['Total Orders', analytics?.totalOrders ?? '—'],
+                                    ['Revenue',      analytics ? `₹${analytics.totalRevenue?.toFixed(0) ?? 0}` : '—'],
+                                ].map(([label, val]) => (
+                                    <div key={label} className="ad-stat">
+                                        <div className="ad-stat-num">{val}</div>
+                                        <div className="ad-stat-label">{label}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {analytics ? (
                                 <div className="ad-charts">
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Book Status</div>
@@ -604,29 +700,35 @@ const AdminDashboard = () => {
                                         <Bar data={orderStatusData} options={{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } }, y:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } } } }} />
                                     </div>
                                 </div>
-                            </>
-                        )}
+                            ) : (
+                                <div className="ad-empty">No analytics data available. Check if backend is running.</div>
+                            )}
+                        </>
+                    )}
 
-                        {/* ── Users ── */}
-                        {tab === 'users' && (
-                            <div className="ad-table-wrap">
-                                <div className="ad-table-head">
-                                    <span className="ad-table-title">Users</span>
-                                    <span className="ad-table-count">{users.length} total</span>
-                                </div>
+                    {/* ══ USERS ══ */}
+                    {tab === 'users' && (
+                        <div className="ad-table-wrap">
+                            <div className="ad-table-head">
+                                <span className="ad-table-title">All Users</span>
+                                <span className="ad-table-count">{users.length} total</span>
+                            </div>
+                            <div className="ad-table-scroll">
                                 <table className="ad-table">
                                     <thead><tr>
                                         <th>ID</th><th>Name</th><th>Email</th>
                                         <th>Phone</th><th>Points</th><th>Role</th><th>Action</th>
                                     </tr></thead>
                                     <tbody>
-                                        {users.map(u => (
+                                        {users.length === 0 ? (
+                                            <tr><td colSpan={7} style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)'}}>No users found</td></tr>
+                                        ) : users.map(u => (
                                             <tr key={u.id}>
-                                                <td>{u.id}</td>
-                                                <td>{u.name}</td>
+                                                <td style={{color:'rgba(255,255,255,0.35)',fontSize:'11px'}}>#{u.id}</td>
+                                                <td style={{fontWeight:500,color:'#fff'}}>{u.name}</td>
                                                 <td>{u.email}</td>
-                                                <td>{u.phone}</td>
-                                                <td>{u.points}</td>
+                                                <td>{u.phone || '—'}</td>
+                                                <td><span style={{color:'#ffc107',fontWeight:600}}>{u.points ?? 0}</span></td>
                                                 <td><span className={`ad-badge ${u.role === 'ADMIN' ? 'ad-role-admin' : 'ad-role-user'}`}>{u.role}</span></td>
                                                 <td>{u.role !== 'ADMIN' && <button className="ad-del-btn" onClick={() => handleDeleteUser(u.id)}>Delete</button>}</td>
                                             </tr>
@@ -634,91 +736,103 @@ const AdminDashboard = () => {
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* ── Books ── */}
-                        {tab === 'books' && (
-                            <div className="ad-table-wrap">
-                                <div className="ad-table-head">
-                                    <span className="ad-table-title">Books</span>
-                                    <span className="ad-table-count">{books.length} total</span>
-                                </div>
+                    {/* ══ BOOKS ══ */}
+                    {tab === 'books' && (
+                        <div className="ad-table-wrap">
+                            <div className="ad-table-head">
+                                <span className="ad-table-title">All Books</span>
+                                <span className="ad-table-count">{books.length} total</span>
+                            </div>
+                            <div className="ad-table-scroll">
                                 <table className="ad-table">
                                     <thead><tr>
                                         <th>ID</th><th>Title</th><th>Author</th>
                                         <th>Type</th><th>Price</th><th>Status</th><th>Seller</th><th>Action</th>
                                     </tr></thead>
                                     <tbody>
-                                        {books.map(b => (
+                                        {books.length === 0 ? (
+                                            <tr><td colSpan={8} style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)'}}>No books found</td></tr>
+                                        ) : books.map(b => (
                                             <tr key={b.id}>
-                                                <td>{b.id}</td>
-                                                <td>{b.title}</td>
+                                                <td style={{color:'rgba(255,255,255,0.35)',fontSize:'11px'}}>#{b.id}</td>
+                                                <td style={{fontWeight:500,color:'#fff',maxWidth:'160px'}}>{b.title}</td>
                                                 <td>{b.author}</td>
-                                                <td><span className="ad-badge" style={{ background:'rgba(160,120,40,0.1)', color:'#a07828', borderColor:'rgba(160,120,40,0.25)' }}>{b.type}</span></td>
-                                                <td>₹{b.price}</td>
+                                                <td><span className="ad-badge" style={{background:'rgba(160,120,40,0.12)',color:'#c89a32',borderColor:'rgba(160,120,40,0.25)'}}>{b.type}</span></td>
+                                                <td style={{color:'#ffc107',fontWeight:600}}>₹{b.price}</td>
                                                 <td>{b.status}</td>
-                                                <td>{b.seller?.name}</td>
+                                                <td>{b.seller?.name || '—'}</td>
                                                 <td><button className="ad-del-btn" onClick={() => handleDeleteBook(b.id)}>Delete</button></td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* ── Orders ── */}
-                        {tab === 'orders' && (
-                            <div className="ad-table-wrap">
-                                <div className="ad-table-head">
-                                    <span className="ad-table-title">Orders</span>
-                                    <span className="ad-table-count">{orders.length} total</span>
-                                </div>
+                    {/* ══ ORDERS ══ */}
+                    {tab === 'orders' && (
+                        <div className="ad-table-wrap">
+                            <div className="ad-table-head">
+                                <span className="ad-table-title">All Orders</span>
+                                <span className="ad-table-count">{orders.length} total</span>
+                            </div>
+                            <div className="ad-table-scroll">
                                 <table className="ad-table">
                                     <thead><tr>
                                         <th>ID</th><th>Buyer</th><th>Book</th>
                                         <th>Type</th><th>Amount</th><th>Status</th>
                                     </tr></thead>
                                     <tbody>
-                                        {orders.map(o => {
+                                        {orders.length === 0 ? (
+                                            <tr><td colSpan={6} style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)'}}>No orders found</td></tr>
+                                        ) : orders.map(o => {
                                             const s = statusStyle[o.status] || statusStyle.PENDING;
                                             return (
                                                 <tr key={o.id}>
-                                                    <td>#{o.id}</td>
-                                                    <td>{o.buyer?.name}</td>
-                                                    <td>{o.book?.title}</td>
+                                                    <td style={{color:'rgba(255,255,255,0.35)',fontSize:'11px'}}>#{o.id}</td>
+                                                    <td style={{fontWeight:500,color:'#fff'}}>{o.buyer?.name || '—'}</td>
+                                                    <td style={{maxWidth:'160px'}}>{o.book?.title || '—'}</td>
                                                     <td>{o.type}</td>
-                                                    <td>₹{o.amount}</td>
-                                                    <td><span className="ad-badge" style={{ background:s.bg, color:s.color, borderColor:s.border }}>{o.status}</span></td>
+                                                    <td style={{color:'#ffc107',fontWeight:600}}>₹{o.amount}</td>
+                                                    <td><span className="ad-badge" style={{background:s.bg,color:s.color,borderColor:s.border}}>{o.status}</span></td>
                                                 </tr>
                                             );
                                         })}
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* ── Delivery ── */}
-                        {tab === 'delivery' && (
-                            <div className="ad-table-wrap">
-                                <div className="ad-table-head">
-                                    <span className="ad-table-title">Delivery Management</span>
-                                    <span className="ad-table-count">{orders.length} orders</span>
-                                </div>
+                    {/* ══ DELIVERY ══ */}
+                    {tab === 'delivery' && (
+                        <div className="ad-table-wrap">
+                            <div className="ad-table-head">
+                                <span className="ad-table-title">Delivery Management</span>
+                                <span className="ad-table-count">{orders.length} orders</span>
+                            </div>
+                            <div className="ad-table-scroll">
                                 <table className="ad-table">
                                     <thead><tr>
                                         <th>Order ID</th><th>Buyer</th><th>Book</th>
-                                        <th>Amount</th><th>Order Status</th><th>Update Delivery</th>
+                                        <th>Amount</th><th>Status</th><th>Update</th>
                                     </tr></thead>
                                     <tbody>
-                                        {orders.map(o => {
+                                        {orders.length === 0 ? (
+                                            <tr><td colSpan={6} style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)'}}>No orders found</td></tr>
+                                        ) : orders.map(o => {
                                             const s = statusStyle[o.status] || statusStyle.PENDING;
                                             return (
                                                 <tr key={o.id}>
-                                                    <td>#{o.id}</td>
-                                                    <td>{o.buyer?.name}</td>
-                                                    <td>{o.book?.title}</td>
-                                                    <td>₹{o.amount}</td>
-                                                    <td><span className="ad-badge" style={{ background:s.bg, color:s.color, borderColor:s.border }}>{o.status}</span></td>
+                                                    <td style={{color:'rgba(255,255,255,0.35)',fontSize:'11px'}}>#{o.id}</td>
+                                                    <td style={{fontWeight:500,color:'#fff'}}>{o.buyer?.name || '—'}</td>
+                                                    <td style={{maxWidth:'160px'}}>{o.book?.title || '—'}</td>
+                                                    <td style={{color:'#ffc107',fontWeight:600}}>₹{o.amount}</td>
+                                                    <td><span className="ad-badge" style={{background:s.bg,color:s.color,borderColor:s.border}}>{o.status}</span></td>
                                                     <td><button className="ad-upd-btn" onClick={() => openDeliveryModal(o)}>Update Delivery</button></td>
                                                 </tr>
                                             );
@@ -726,121 +840,145 @@ const AdminDashboard = () => {
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* ── Messages ── */}
-                        {tab === 'messages' && (
-                            <div className="ad-table-wrap">
-                                <div className="ad-table-head">
-                                    <span className="ad-table-title">Contact Messages</span>
-                                    <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-                                        <span className="ad-table-count">{messages.length} total</span>
-                                        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="ad-m-select" style={{ maxWidth:'160px' }}>
-                                            <option value="ALL">All Priority</option>
-                                            <option value="LOW">Low</option>
-                                            <option value="MEDIUM">Medium</option>
-                                            <option value="HIGH">High</option>
-                                        </select>
-                                    </div>
+                    {/* ══ MESSAGES ══ */}
+                    {tab === 'messages' && (
+                        <div className="ad-table-wrap">
+                            <div className="ad-table-head">
+                                <span className="ad-table-title">Contact Messages</span>
+                                <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+                                    <span className="ad-table-count">{messages.length} total</span>
+                                    <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                                        className="ad-m-select" style={{maxWidth:'150px',padding:'6px 10px'}}>
+                                        <option value="ALL">All Priority</option>
+                                        <option value="LOW">Low</option>
+                                        <option value="MEDIUM">Medium</option>
+                                        <option value="HIGH">High</option>
+                                    </select>
                                 </div>
+                            </div>
+                            <div className="ad-table-scroll">
                                 <table className="ad-table">
                                     <thead><tr>
                                         <th>ID</th><th>Name</th><th>Email</th><th>Subject</th>
-                                        <th>Priority</th><th>Status</th><th>Message</th><th>Action</th>
+                                        <th>Priority</th><th>Status</th><th>Message</th><th>Actions</th>
                                     </tr></thead>
                                     <tbody>
-                                        {messages.filter(m => filterPriority === 'ALL' || m.priority === filterPriority).map(m => (
+                                        {messages.filter(m => filterPriority === 'ALL' || m.priority === filterPriority).length === 0 ? (
+                                            <tr><td colSpan={8} style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)'}}>No messages</td></tr>
+                                        ) : messages.filter(m => filterPriority === 'ALL' || m.priority === filterPriority).map(m => (
                                             <tr key={m.id}>
-                                                <td>{m.id}</td>
-                                                <td>{m.name}</td>
-                                                <td>{m.email}</td>
-                                                <td>{m.subject}</td>
-                                                <td><span className="ad-badge">{m.priority}</span></td>
-                                                <td><span className="ad-badge">{m.status}</span></td>
-                                                <td>{m.message}</td>
+                                                <td style={{color:'rgba(255,255,255,0.35)',fontSize:'11px'}}>#{m.id}</td>
+                                                <td style={{fontWeight:500,color:'#fff'}}>{m.name}</td>
+                                                <td style={{fontSize:'12px'}}>{m.email}</td>
+                                                <td style={{maxWidth:'120px',fontSize:'12px'}}>{m.subject}</td>
                                                 <td>
-                                                    <button className="ad-upd-btn" onClick={() => updateStatus(m.id, 'RESOLVED')}>Resolve</button>
-                                                    <div style={{ marginTop:'8px' }}>
-                                                        <input className="ad-m-input" placeholder="Reply..." value={replyText[m.id] || ''} onChange={e => setReplyText({ ...replyText, [m.id]: e.target.value })} />
-                                                    </div>
-                                                    <div style={{ marginTop:'6px' }}>
-                                                        <button className="ad-upd-btn" style={{ width:'100%' }} onClick={() => sendReply(m.id)}>Send Reply 🚀</button>
-                                                    </div>
+                                                    <span className="ad-badge" style={{
+                                                        background: m.priority === 'HIGH' ? 'rgba(255,80,80,0.1)' : m.priority === 'MEDIUM' ? 'rgba(255,193,7,0.1)' : 'rgba(80,160,80,0.1)',
+                                                        color:      m.priority === 'HIGH' ? 'rgba(255,100,100,0.9)' : m.priority === 'MEDIUM' ? '#ffc107' : '#5ab85a',
+                                                        borderColor:m.priority === 'HIGH' ? 'rgba(255,80,80,0.2)'  : m.priority === 'MEDIUM' ? 'rgba(255,193,7,0.2)' : 'rgba(80,160,80,0.2)',
+                                                    }}>{m.priority}</span>
+                                                </td>
+                                                <td>
+                                                    <span className="ad-badge" style={{
+                                                        background: m.status === 'RESOLVED' ? 'rgba(80,160,80,0.1)' : 'rgba(255,193,7,0.1)',
+                                                        color:      m.status === 'RESOLVED' ? '#5ab85a' : '#ffc107',
+                                                        borderColor:m.status === 'RESOLVED' ? 'rgba(80,160,80,0.2)' : 'rgba(255,193,7,0.2)',
+                                                    }}>{m.status}</span>
+                                                </td>
+                                                <td style={{maxWidth:'180px',fontSize:'12px',color:'rgba(255,255,255,0.55)'}}>{m.message}</td>
+                                                <td style={{minWidth:'180px'}}>
+                                                    <button className="ad-upd-btn" onClick={() => updateStatus(m.id, 'RESOLVED')}
+                                                        style={{marginBottom:'8px',width:'100%'}}>
+                                                        ✓ Resolve
+                                                    </button>
+                                                    <input className="ad-m-input" placeholder="Type reply..."
+                                                        style={{marginBottom:'6px'}}
+                                                        value={replyText[m.id] || ''}
+                                                        onChange={e => setReplyText(r => ({ ...r, [m.id]: e.target.value }))} />
+                                                    <button className="ad-upd-btn" style={{width:'100%',background:'#0d6efd',color:'#fff'}}
+                                                        onClick={() => sendReply(m.id)}>
+                                                        Send Reply 🚀
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                    </>}
+                </>}
+            </div>
+        </div>
+
+        {/* ══ DELIVERY MODAL ══ */}
+        {deliveryModal && (
+            <div className="ad-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeliveryModal(null); }}>
+                <div className="ad-modal">
+                    <div className="ad-modal-head">
+                        <div>
+                            <div className="ad-modal-title">Update Delivery</div>
+                            <div className="ad-modal-sub">Order #{deliveryModal.id} — {deliveryModal.book?.title}</div>
+                        </div>
+                        <button className="ad-modal-close" onClick={() => setDeliveryModal(null)}>×</button>
+                    </div>
+                    <form onSubmit={handleDeliveryUpdate}>
+                        <div className="ad-modal-body">
+                            {deliveryError && <div className="ad-m-err">{deliveryError}</div>}
+                            {deliveryOk    && <div className="ad-m-ok">✓ Delivery updated successfully!</div>}
+
+                            <div>
+                                <label className="ad-m-label">Delivery Status</label>
+                                <select className="ad-m-select" value={deliveryForm.status}
+                                    onChange={e => setDeliveryForm(f => ({ ...f, status:e.target.value }))}>
+                                    {DELIVERY_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="ad-m-label">Current Location (city name → auto-fills coords)</label>
+                                <input className="ad-m-input" type="text" placeholder="e.g. Pune"
+                                    value={deliveryForm.currentLocation}
+                                    onChange={e => setDeliveryForm(f => ({ ...f, currentLocation:e.target.value }))}
+                                    onBlur={() => getCoordinates(deliveryForm.currentLocation)} />
+                            </div>
+
+                            <div>
+                                <label className="ad-m-label">Message to Customer</label>
+                                <textarea className="ad-m-textarea" placeholder="e.g. Your package is out for delivery"
+                                    value={deliveryForm.message}
+                                    onChange={e => setDeliveryForm(f => ({ ...f, message:e.target.value }))} />
+                            </div>
+
+                            <div className="ad-m-row">
+                                <div>
+                                    <label className="ad-m-label">Latitude</label>
+                                    <input className="ad-m-input" type="number" step="any" placeholder="18.5204"
+                                        value={deliveryForm.latitude}
+                                        onChange={e => setDeliveryForm(f => ({ ...f, latitude:e.target.value }))} />
+                                </div>
+                                <div>
+                                    <label className="ad-m-label">Longitude</label>
+                                    <input className="ad-m-input" type="number" step="any" placeholder="73.8567"
+                                        value={deliveryForm.longitude}
+                                        onChange={e => setDeliveryForm(f => ({ ...f, longitude:e.target.value }))} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="ad-modal-foot">
+                            <button type="button" className="ad-m-cancel" onClick={() => setDeliveryModal(null)}>Cancel</button>
+                            <button type="submit" className="ad-m-save" disabled={deliverySaving}>
+                                {deliverySaving ? 'Saving…' : 'Save Update'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
-
-            {/* ── Delivery Modal ── */}
-            {deliveryModal && (
-                <div className="ad-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeliveryModal(null); }}>
-                    <div className="ad-modal">
-                        <div className="ad-modal-head">
-                            <div>
-                                <div className="ad-modal-title">Update Delivery</div>
-                                <div className="ad-modal-sub">Order #{deliveryModal.id} — {deliveryModal.book?.title}</div>
-                            </div>
-                            <button className="ad-modal-close" onClick={() => setDeliveryModal(null)}>×</button>
-                        </div>
-                        <form onSubmit={handleDeliveryUpdate}>
-                            <div className="ad-modal-body">
-                                {deliveryError && <div className="ad-m-err">{deliveryError}</div>}
-                                {deliveryOk    && <div className="ad-m-ok">✓ Delivery updated successfully!</div>}
-
-                                <div>
-                                    <div className="ad-m-label">Delivery Status</div>
-                                    <select className="ad-m-select" value={deliveryForm.status} onChange={e => setDeliveryForm({...deliveryForm, status: e.target.value})}>
-                                        {DELIVERY_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <div className="ad-m-label">Current Location</div>
-                                    <input className="ad-m-input" type="text" placeholder="Enter city (e.g. Pune)"
-                                        value={deliveryForm.currentLocation}
-                                        onChange={e => setDeliveryForm({...deliveryForm, currentLocation: e.target.value})}
-                                        onBlur={() => getCoordinates(deliveryForm.currentLocation)} />
-                                </div>
-
-                                <div>
-                                    <div className="ad-m-label">Message to Customer</div>
-                                    <textarea className="ad-m-textarea" placeholder="e.g. Your package is out for delivery"
-                                        value={deliveryForm.message}
-                                        onChange={e => setDeliveryForm({...deliveryForm, message: e.target.value})} />
-                                </div>
-
-                                <div className="ad-m-row">
-                                    <div>
-                                        <div className="ad-m-label">Latitude (optional)</div>
-                                        <input className="ad-m-input" type="number" step="any" placeholder="18.5204"
-                                            value={deliveryForm.latitude}
-                                            onChange={e => setDeliveryForm({...deliveryForm, latitude: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <div className="ad-m-label">Longitude (optional)</div>
-                                        <input className="ad-m-input" type="number" step="any" placeholder="73.8567"
-                                            value={deliveryForm.longitude}
-                                            onChange={e => setDeliveryForm({...deliveryForm, longitude: e.target.value})} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="ad-modal-foot">
-                                <button type="button" className="ad-m-cancel" onClick={() => setDeliveryModal(null)}>Cancel</button>
-                                <button type="submit" className="ad-m-save" disabled={deliverySaving}>
-                                    {deliverySaving ? 'Saving…' : 'Save Update'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+        )}
         </>
     );
 };
