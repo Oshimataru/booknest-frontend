@@ -15,7 +15,7 @@ ChartJS.register(
 );
 
 /* ─── CONFIG ──────────────────────────────────────────────── */
-VITE_API_BASE_URL=https://booknest-b.onrender.com;
+VITE_API_BASE_URL== import.meta.env.VITE_API_BASE_URL;
 
 const statusStyle = {
     PENDING:          { bg: 'rgba(184,134,11,0.12)',  color: '#b8860b',              border: 'rgba(184,134,11,0.3)'   },
