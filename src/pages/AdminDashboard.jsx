@@ -199,6 +199,12 @@ const AdminDashboard = () => {
         }]
     };
 
+    const totalPendingMessages = messages.filter(m => m.status !== 'RESOLVED').length;
+    const totalResolvedMessages = messages.filter(m => m.status === 'RESOLVED').length;
+    const averageOrderValue = orders.length ? orders.reduce((sum,order) => sum + (Number(order.amount) || 0), 0) / orders.length : 0;
+    const activeOrders = orders.filter(order => order.status !== 'DELIVERED').length;
+    const mostCommonBookType = Object.entries(bookTypeCounts).sort((a,b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
     const chartTextColor = 'rgba(255,255,255,0.85)';
     const chartGridColor = 'rgba(255,193,7,0.16)';
     const chartCommonOptions = {
@@ -354,20 +360,22 @@ const AdminDashboard = () => {
 
             .ad-stats {
                 display: grid;
-                grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
-                gap: 12px;
+                grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+                gap: 14px;
                 margin-bottom: 28px;
             }
 
             .ad-stat {
-                background: #0d0d0d;
-                border: 1px solid rgba(255,193,7,0.1);
-                border-radius: 8px;
+                background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+                border: 1px solid rgba(255,193,7,0.15);
+                border-radius: 16px;
                 padding: 24px 20px;
                 text-align: center;
-                transition: border-color 0.2s;
+                transition: transform 0.25s ease, border-color 0.2s, box-shadow 0.25s ease;
+                box-shadow: 0 18px 42px rgba(0,0,0,0.16);
+                animation: statFade 0.9s ease both;
             }
-            .ad-stat:hover { border-color: rgba(255,193,7,0.3); }
+            .ad-stat:hover { border-color: rgba(255,193,7,0.35); transform: translateY(-3px); box-shadow: 0 24px 54px rgba(0,0,0,0.22); }
 
             .ad-stat-num { font-size:30px; font-weight:600; color:#ffc107; line-height:1; }
             .ad-stat-label { font-size:11px; color:rgba(255,255,255,0.35); margin-top:6px; text-transform:uppercase; letter-spacing:0.06em; }
@@ -426,10 +434,42 @@ const AdminDashboard = () => {
             }
 
             .ad-table-wrap {
-                background: #0d0d0d;
-                border: 1px solid rgba(255,193,7,0.08);
-                border-radius: 8px;
+                background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+                border: 1px solid rgba(255,193,7,0.12);
+                border-radius: 16px;
                 overflow: hidden;
+                box-shadow: 0 22px 45px rgba(0,0,0,0.14);
+                animation: tableAppear 0.9s ease both;
+            }
+
+            .ad-table-head { position: relative; }
+            .ad-table-subline {
+                display:block;
+                margin-top:6px;
+                font-size:12px;
+                color:rgba(255,255,255,0.45);
+            }
+
+            .ad-table tbody tr {
+                transition: transform 0.25s ease, background 0.25s ease, opacity 0.25s ease;
+                transform: translateY(10px);
+                opacity: 0;
+                animation: rowIn 0.45s ease forwards;
+            }
+            .ad-table tbody tr:nth-child(1) { animation-delay: 0.08s; }
+            .ad-table tbody tr:nth-child(2) { animation-delay: 0.14s; }
+            .ad-table tbody tr:nth-child(3) { animation-delay: 0.20s; }
+            .ad-table tbody tr:nth-child(4) { animation-delay: 0.26s; }
+            .ad-table tbody tr:nth-child(5) { animation-delay: 0.32s; }
+            .ad-table tbody tr:nth-child(6) { animation-delay: 0.38s; }
+            .ad-table tbody tr:hover { transform: translateY(-1px); background:rgba(255,193,7,0.08); }
+
+            @keyframes rowIn {
+                to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes tableAppear {
+                from { opacity: 0; transform: translateY(12px); }
+                to { opacity: 1; transform: translateY(0); }
             }
 
             .ad-table-head {
@@ -666,10 +706,14 @@ const AdminDashboard = () => {
                         <>
                             <div className="ad-stats">
                                 {[
-                                    ['Total Users',  analytics?.totalUsers  ?? '—'],
-                                    ['Total Books',  analytics?.totalBooks  ?? '—'],
-                                    ['Total Orders', analytics?.totalOrders ?? '—'],
-                                    ['Revenue',      analytics ? `₹${analytics.totalRevenue?.toFixed(0) ?? 0}` : '—'],
+                                    ['Total Users',         analytics?.totalUsers          ?? '—'],
+                                    ['Total Books',         analytics?.totalBooks          ?? '—'],
+                                    ['Total Orders',        analytics?.totalOrders         ?? '—'],
+                                    ['Revenue',             analytics ? `₹${analytics.totalRevenue?.toFixed(0) ?? 0}` : '—'],
+                                    ['Avg Order Value',     analytics ? `₹${averageOrderValue.toFixed(0)}` : '—'],
+                                    ['Active Orders',       `${activeOrders}`],
+                                    ['Pending Messages',    `${totalPendingMessages}`],
+                                    ['Top Book Type',       mostCommonBookType],
                                 ].map(([label, val]) => (
                                     <div key={label} className="ad-stat">
                                         <div className="ad-stat-num">{val}</div>
@@ -712,6 +756,7 @@ const AdminDashboard = () => {
                             <div className="ad-table-head">
                                 <span className="ad-table-title">All Users</span>
                                 <span className="ad-table-count">{users.length} total</span>
+                                <span className="ad-table-subline">Admins: {users.filter(u => u.role === 'ADMIN').length} · Members: {users.filter(u => u.role !== 'ADMIN').length}</span>
                             </div>
                             <div className="ad-table-scroll">
                                 <table className="ad-table">
@@ -746,6 +791,7 @@ const AdminDashboard = () => {
                             <div className="ad-table-head">
                                 <span className="ad-table-title">All Books</span>
                                 <span className="ad-table-count">{books.length} total</span>
+                                <span className="ad-table-subline">Top genre: {mostCommonBookType} · Unique types: {Object.keys(bookTypeCounts).length}</span>
                             </div>
                             <div className="ad-table-scroll">
                                 <table className="ad-table">
@@ -781,6 +827,7 @@ const AdminDashboard = () => {
                             <div className="ad-table-head">
                                 <span className="ad-table-title">All Orders</span>
                                 <span className="ad-table-count">{orders.length} total</span>
+                                <span className="ad-table-subline">Avg order ₹{averageOrderValue.toFixed(0)} · Active deliveries: {activeOrders}</span>
                             </div>
                             <div className="ad-table-scroll">
                                 <table className="ad-table">
@@ -854,6 +901,7 @@ const AdminDashboard = () => {
                                 <span className="ad-table-title">Contact Messages</span>
                                 <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
                                     <span className="ad-table-count">{messages.length} total</span>
+                                    <span className="ad-table-subline">Pending: {totalPendingMessages} · Resolved: {totalResolvedMessages}</span>
                                     <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
                                         className="ad-m-select" style={{maxWidth:'150px',padding:'6px 10px'}}>
                                         <option value="ALL">All Priority</option>
