@@ -10,7 +10,29 @@ const AddBook = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        const numericFields = ['price', 'rentPrice', 'quantity'];
+        const nextFormData = {
+            ...formData,
+            [name]: numericFields.includes(name) ? (value === '' ? '' : Number(value)) : value,
+        };
+
+        if (name === 'price' && nextFormData.type === 'RENT') {
+            nextFormData.rentPrice = nextFormData.price ? Number((nextFormData.price * 0.3).toFixed(2)) : '';
+        }
+
+        if (name === 'type') {
+            if (value === 'RENT') {
+                nextFormData.rentPrice = nextFormData.price ? Number((nextFormData.price * 0.3).toFixed(2)) : '';
+            } else {
+                nextFormData.rentPrice = '';
+            }
+        }
+
+        setFormData(nextFormData);
+    };
+
     const handleImage = (e) => { const f = e.target.files[0]; if (!f) return; setImage(f); setPreview(URL.createObjectURL(f)); };
 
     const handleSubmit = async (e) => {
@@ -240,6 +262,10 @@ const AddBook = () => {
                         <p className="ab-sec">Transaction Info</p>
                         <div className="ab-row">
                             <div className="ab-group">
+                                <label className="ab-label">Quantity</label>
+                                <input className="ab-input" type="number" name="quantity" min="1" step="1" placeholder="1" value={formData.quantity} onChange={handleChange} required />
+                            </div>
+                            <div className="ab-group">
                                 <label className="ab-label">List Type</label>
                                 <select className="ab-select" name="type" value={formData.type} onChange={handleChange}>
                                     <option value="SELL">Sell</option>
@@ -247,6 +273,16 @@ const AddBook = () => {
                                     <option value="EXCHANGE">Exchange</option>
                                 </select>
                             </div>
+                        </div>
+                        {formData.type === 'RENT' && (
+                            <div className="ab-row">
+                                <div className="ab-group">
+                                    <label className="ab-label">Rent Price (30% of book price)</label>
+                                    <input className="ab-input" type="number" name="rentPrice" value={formData.rentPrice} readOnly />
+                                </div>
+                            </div>
+                        )}
+                        <div className="ab-row">
                             <div className="ab-group">
                                 <label className="ab-label">Condition</label>
                                 <select className="ab-select" name="condition" value={formData.condition} onChange={handleChange} required>
