@@ -9,7 +9,7 @@ import {
     Chart as ChartJS, ArcElement, Tooltip, Legend,
     CategoryScale, LinearScale, BarElement, Title
 } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
+import { Doughnut, Bar, Pie } from 'react-chartjs-2';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
@@ -156,6 +156,27 @@ const AdminDashboard = () => {
         labels: ['Pending','Delivered','Others'],
         datasets: [{ label:'Orders', data:[analytics?.pendingOrders||0,analytics?.deliveredOrders||0,(analytics?.totalOrders||0)-(analytics?.pendingOrders||0)-(analytics?.deliveredOrders||0)], backgroundColor:['#a07828','#4a8c4a','#4a7fa5'], borderRadius:4 }]
     };
+
+    const bookTypeCounts = books.reduce((acc, b) => {
+        const type = b.type || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+    }, {});
+    const bookTypeData = {
+        labels: Object.keys(bookTypeCounts),
+        datasets: [{ data: Object.values(bookTypeCounts), backgroundColor:['#a07828','#4a7fa5','#7a68a8','#4a8c4a','#ffc107'], borderWidth:0 }]
+    };
+
+    const orderRevenueByStatus = orders.reduce((acc, order) => {
+        const status = order.status || 'UNKNOWN';
+        acc[status] = (acc[status] || 0) + (Number(order.amount) || 0);
+        return acc;
+    }, {});
+    const orderRevenueData = {
+        labels: Object.keys(orderRevenueByStatus),
+        datasets: [{ label:'Revenue', data: Object.values(orderRevenueByStatus), backgroundColor:['#4a8c4a','#4a7fa5','#a07828','#7a68a8','#c0392b'].slice(0, Object.keys(orderRevenueByStatus).length), borderRadius:4 }]
+    };
+
     const chartTextColor = 'rgba(255,255,255,0.6)';
     const chartGridColor = 'rgba(255,193,7,0.1)';
 
@@ -581,6 +602,16 @@ const AdminDashboard = () => {
                                     <div className="ad-chart">
                                         <div className="ad-chart-title">Order Status</div>
                                         <Bar data={orderStatusData} options={{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } }, y:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } } } }} />
+                                    </div>
+                                    <div className="ad-chart">
+                                        <div className="ad-chart-title">Book Type Distribution</div>
+                                        <div className="ad-chart-wrap">
+                                            <Pie data={bookTypeData} options={{ plugins:{ legend:{ labels:{ color:chartTextColor, font:{ family:'Inter', size:12 } } } } }} />
+                                        </div>
+                                    </div>
+                                    <div className="ad-chart">
+                                        <div className="ad-chart-title">Revenue by Order Status</div>
+                                        <Bar data={orderRevenueData} options={{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } }, y:{ ticks:{ color:chartTextColor }, grid:{ color:chartGridColor } } } }} />
                                     </div>
                                 </div>
                             ) : (
