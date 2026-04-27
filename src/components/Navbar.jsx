@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from "axios";
+import { API_ROOT } from '../config/api';
 
 const NAV_LINKS = [
   { label: 'Browse',       path: '/books',        auth: false },
@@ -39,7 +40,7 @@ const Navbar = () => {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        "http://localhost:8082/api/contact/my",
+        `${API_ROOT}/contact/my`,
         {
           headers: {
             Authorization: `Bearer ${token}`

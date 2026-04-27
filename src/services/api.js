@@ -88,10 +88,11 @@
 // export const getAdminOrders = () => API.get('/admin/orders');
 // ---------------------------------------------------------LOCAL------------------------------------------------------------------------
 import axios from 'axios';
+import { API_ROOT } from '../config/api';
 
 // ✅ Base URL fixed for local Spring Boot
 const API = axios.create({
-    baseURL: 'http://localhost:8082/api'
+    baseURL: API_ROOT
 });
 
 // ✅ Attach JWT token automatically

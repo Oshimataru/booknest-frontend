@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_ROOT } from "../config/api";
 
 function MyTickets() {
   const [tickets, setTickets] = useState([]);
@@ -10,7 +11,7 @@ function MyTickets() {
         const token = localStorage.getItem("token");
 
         const res = await axios.get(
-          "http://localhost:8082/api/contact/my",
+          `${API_ROOT}/contact/my`,
           {
             headers: {
               Authorization: `Bearer ${token}`

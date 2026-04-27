@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
+import { API_ROOT } from "../config/api";
 
 function Contact() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ function Contact() {
       const token = localStorage.getItem("token");
 
       await axios.post(
-        "http://localhost:8082/api/contact",
+        `${API_ROOT}/contact`,
         {
           subject,
           priority,

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { HOME_API_ROOT } from './config/api';
 
 import Navbar             from './components/Navbar';
 import Footer             from './components/Footer';
@@ -27,8 +28,6 @@ import EditBook           from './pages/EditBook';
 
 import './styles/Auth.css';
 import './styles/Global.css';
-
-const API = 'http://localhost:8082/api/home';
 
 const ProtectedRoute = ({ children }) => {
     const { user } = useAuth();
@@ -218,12 +217,12 @@ const Home = () => {
 
     useEffect(() => {
         Promise.all([
-            axios.post(`${API}/stats`),
-            axios.post(`${API}/featured`),
-            axios.post(`${API}/books`),
-            axios.post(`${API}/genres`),
-            axios.post(`${API}/reviews`),
-            axios.post(`${API}/clubs`),
+            axios.post(`${HOME_API_ROOT}/stats`),
+            axios.post(`${HOME_API_ROOT}/featured`),
+            axios.post(`${HOME_API_ROOT}/books`),
+            axios.post(`${HOME_API_ROOT}/genres`),
+            axios.post(`${HOME_API_ROOT}/reviews`),
+            axios.post(`${HOME_API_ROOT}/clubs`),
         ]).then(([s, f, b, g, r, c]) => {
             setStats(s.data); setFeat(f.data);
             setBooks(b.data); setGenres(g.data);
