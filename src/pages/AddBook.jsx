@@ -259,12 +259,20 @@ const AddBook = () => {
                             <textarea className="ab-textarea" name="description" placeholder="Brief summary of the book condition or story..." value={formData.description} onChange={handleChange} required />
                         </div>
 
-                        <p className="ab-sec">Transaction Info</p>
+                        <p className="ab-sec">Inventory</p>
                         <div className="ab-row">
                             <div className="ab-group">
                                 <label className="ab-label">Quantity</label>
                                 <input className="ab-input" type="number" name="quantity" min="1" step="1" placeholder="1" value={formData.quantity} onChange={handleChange} required />
                             </div>
+                            <div className="ab-group">
+                                <label className="ab-label">Location</label>
+                                <input className="ab-input" type="text" name="location" placeholder="City name" value={formData.location} onChange={handleChange} required />
+                            </div>
+                        </div>
+
+                        <p className="ab-sec">Transaction Info</p>
+                        <div className="ab-row">
                             <div className="ab-group">
                                 <label className="ab-label">List Type</label>
                                 <select className="ab-select" name="type" value={formData.type} onChange={handleChange}>
@@ -273,16 +281,6 @@ const AddBook = () => {
                                     <option value="EXCHANGE">Exchange</option>
                                 </select>
                             </div>
-                        </div>
-                        {formData.type === 'RENT' && (
-                            <div className="ab-row">
-                                <div className="ab-group">
-                                    <label className="ab-label">Rent Price (30% of book price)</label>
-                                    <input className="ab-input" type="number" name="rentPrice" value={formData.rentPrice} readOnly />
-                                </div>
-                            </div>
-                        )}
-                        <div className="ab-row">
                             <div className="ab-group">
                                 <label className="ab-label">Condition</label>
                                 <select className="ab-select" name="condition" value={formData.condition} onChange={handleChange} required>
@@ -294,6 +292,14 @@ const AddBook = () => {
                                 </select>
                             </div>
                         </div>
+                        {formData.type === 'RENT' && (
+                            <div className="ab-row">
+                                <div className="ab-group">
+                                    <label className="ab-label">Rent Price (30% of book price)</label>
+                                    <input className="ab-input" type="number" name="rentPrice" value={formData.rentPrice} readOnly />
+                                </div>
+                            </div>
+                        )}
 
                         <div className="ab-row">
                             <div className="ab-group">
