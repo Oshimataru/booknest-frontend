@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import {
     Chart as ChartJS,
     ArcElement, Tooltip, Legend,
@@ -15,7 +16,7 @@ ChartJS.register(
 );
 
 /* ─── CONFIG ──────────────────────────────────────────────── */
-VITE_API_BASE_URL= "https://booknest-b.onrender.com";
+const API = API_BASE_URL;
 
 const statusStyle = {
     PENDING:          { bg: 'rgba(184,134,11,0.12)',  color: '#b8860b',              border: 'rgba(184,134,11,0.3)'   },
