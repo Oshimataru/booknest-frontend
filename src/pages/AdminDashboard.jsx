@@ -93,9 +93,15 @@ const AdminDashboard = () => {
     const [deliveryOk,     setDeliveryOk]     = useState(false);
 
     useEffect(() => {
-        if (user?.role !== 'ADMIN') { navigate('/'); return; }
-        fetchAll();
-    }, []);
+    if (!user) return; // wait for user
+
+    if (user.role !== 'ADMIN') {
+        navigate('/');
+        return;
+    }
+
+    fetchAll();
+}, [user]);
     const token = localStorage.getItem("token");
 
 
