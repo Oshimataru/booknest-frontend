@@ -168,8 +168,13 @@ const AdminDashboard = () => {
     const chartGridColor = 'rgba(255,193,7,0.1)';
 
     // Still resolving user from context
-    if (user === undefined) return null;
-
+   if (user === undefined) return <div style={{color:'white',padding:'40px',fontSize:'20px'}}>Loading user...</div>;
+useEffect(() => {
+    if (user === null) { navigate('/login'); return; }  // not logged in
+    if (user === undefined) return;                      // still loading
+    if (user.role !== 'ADMIN') { navigate('/'); return; }
+    fetchAll();
+}, [user]);
     return (
         <>
         <style>{`
